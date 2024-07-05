@@ -12,17 +12,19 @@ import json
 # ffmpeg -i .\goproVideo.MP4 -map 0:3 -c copy -f data goproMetadata.bin
 # you will get a binary file with the metadata with the name typed above (goproMetadata.bin)
 
-INPUT_FILE_NAME = 'out-0002.bin'
+INPUT_FILE_NAME = 'goproMetadata.bin'
 OUTPUT_FILE_NAME = 'output.json'
 
 # JSON formatting options
-MINIFY_JSON_NAMES = False  # change names in json to one letter names
+MINIFY_JSON_NAMES = True  # change names in json to one letter names to save space
 INDENT_JSON = 0  # 0 for minified, 4 for pretty print (significantly bigger file - not recommended)
 # 4 - 92,48 MB, 2 - 51,95 MB, 0 - 7,36 MB for an example 2,55 MB binary file (no minified names used)
 
 # Console output options
 PRINT_KEYS_TO_CONSOLE = False
 PRINT_VALUES_TO_CONSOLE = False
+
+ERROR_ON_UNKNOWN_TYPE = False  # if True, the script will throw an error on unknown type, otherwise it will ignore it
 
 # Global variables for parsing
 hierarchy = []
@@ -99,6 +101,7 @@ def handle_types(file):
     """
     type_code = hierarchy[-1][1]
     data = read_bytes(file, hierarchy[-1][2])
+    value = None
     if type_code == 'b':
         value = bytes_to_number(data, 1, signed=True)
     elif type_code == 'B':
@@ -125,10 +128,14 @@ def handle_types(file):
         time_str = bytes_to_string(data)
         value = f'{time_str[4:6]}.{time_str[2:4]}.20{time_str[0:2]} {time_str[6:8]}:{time_str[8:10]}:{time_str[10:12]}.{time_str[13:16]}'
     else:
-        raise ValueError(f"Type '{type_code}' not implemented")  # F, G, q, Q, ?
-    json_add_value(value if len(value) > 1 else value[0])
-    if PRINT_VALUES_TO_CONSOLE:
-        print_hierarchically(f'Value: {value}')
+        if ERROR_ON_UNKNOWN_TYPE:
+            raise ValueError(f"Type '{type_code}' not implemented")  # F, G, q, Q, ?
+        else:
+            print(f"Type '{type_code}' not implemented, ignoring - ERROR_ON_UNKNOWN_TYPE is False")
+    if value:
+        json_add_value(value if len(value) > 1 else value[0])
+        if PRINT_VALUES_TO_CONSOLE:
+            print_hierarchically(f'Value: {value}')
     hierarchy[:] = [h for h in hierarchy if h[5] != 0]
 
 
